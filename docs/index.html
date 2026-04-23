@@ -143,6 +143,16 @@
   .stats { font-size: 11px; color: var(--muted); }
   .stats span { color: var(--text); }
 
+  .input-hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+
+  .char-counter {
+    font-size: 12px; text-align: right; margin-top: 5px;
+    color: var(--muted); font-family: monospace; transition: color .2s;
+  }
+  .char-counter.ok   { color: var(--green); }
+  .char-counter.warn { color: var(--yellow); }
+  .char-counter.over { color: var(--red); font-weight: 600; }
+
   /* Drag-and-drop highlight */
   body.dragging .drop-zone { border-color: var(--accent2); }
 
@@ -188,15 +198,17 @@
     <div>
       <label>Message to hide</label>
       <textarea id="enc-text" placeholder="Type your secret message…"></textarea>
+      <div class="char-counter" id="enc-char-counter">0 / ~84 chars available</div>
+      <div class="input-hint">Live estimate from grid detail + recovery settings. Emoji/symbol-heavy text can use more space.</div>
     </div>
 
     <div class="row">
       <div>
-        <label>Zones per side (n_zones)</label>
+        <label>Grid detail (zones per side)</label>
         <input type="number" id="enc-zones" value="32" min="8" max="64" step="8">
       </div>
       <div>
-        <label>ECC parity bytes (ecc_nsym)</label>
+        <label>Error recovery strength (extra correction bytes)</label>
         <input type="number" id="enc-ecc" value="40" min="10" max="120">
       </div>
     </div>
@@ -229,11 +241,11 @@
 
     <div class="row">
       <div>
-        <label>Zones per side (must match encode)</label>
+        <label>Grid detail (must match encode)</label>
         <input type="number" id="dec-zones" value="32" min="8" max="64" step="8">
       </div>
       <div>
-        <label>ECC parity bytes (must match encode)</label>
+        <label>Error recovery strength (must match encode)</label>
         <input type="number" id="dec-ecc" value="40" min="10" max="120">
       </div>
     </div>
@@ -352,7 +364,7 @@ def encode_zone(arr, text, n_zones, ecc_nsym):
     if n_bits > n_total:
         raise ValueError(
             f'Message too long: need {n_bits} zones, have {n_total}. '
-            f'Use a larger n_zones or shorter message.'
+            f'Increase zones per side or shorten the message.'
         )
 
     rng = np.random.default_rng(0)
@@ -476,6 +488,66 @@ function setStatus(id, cls, msg) {
   el.textContent = msg;
 }
 
+const UTF8_ENCODER = new TextEncoder();
+const ZONE_HEADER_BIT_COUNT = 32;
+const CAPACITY_WARNING_RATIO = 0.9;
+
+function parseNonNegativeInt(value, fallback = 0) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, parsed);
+}
+
+function estimateMessageCapacityChars(zonesPerSide, errorCorrectionBytes) {
+  const totalZoneBits = zonesPerSide * zonesPerSide;
+  const usablePayloadBits = Math.max(0, totalZoneBits - ZONE_HEADER_BIT_COUNT);
+  const payloadBytesCapacity = Math.floor(usablePayloadBits / 8);
+  return Math.max(0, payloadBytesCapacity - errorCorrectionBytes);
+}
+
+function readEncodeCapacityState() {
+  const zonesPerSide = parseNonNegativeInt(document.getElementById('enc-zones').value);
+  const errorCorrectionBytes = parseNonNegativeInt(document.getElementById('enc-ecc').value);
+  const messageText = document.getElementById('enc-text').value.trim();
+  const messageCharacterCount = messageText.length;
+  const messageByteCount = UTF8_ENCODER.encode(messageText).length;
+  const availableCharacterEstimate = estimateMessageCapacityChars(zonesPerSide, errorCorrectionBytes);
+
+  return {
+    zonesPerSide,
+    errorCorrectionBytes,
+    messageText,
+    messageCharacterCount,
+    messageByteCount,
+    availableCharacterEstimate
+  };
+}
+
+function updateEncodeCharCounter() {
+  const counter = document.getElementById('enc-char-counter');
+  const {
+    messageCharacterCount,
+    messageByteCount,
+    availableCharacterEstimate
+  } = readEncodeCapacityState();
+
+  counter.textContent = `${messageCharacterCount} / ~${availableCharacterEstimate} chars available`;
+  counter.className = 'char-counter';
+
+  if (messageByteCount > availableCharacterEstimate) {
+    counter.classList.add('over');
+  } else if (
+    availableCharacterEstimate > 0 &&
+    messageByteCount >= Math.floor(availableCharacterEstimate * CAPACITY_WARNING_RATIO)
+  ) {
+    counter.classList.add('warn');
+  } else {
+    counter.classList.add('ok');
+  }
+
+  return { messageByteCount, availableCharacterEstimate };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // File drag-and-drop polish
 // ─────────────────────────────────────────────────────────────────────────────
@@ -504,6 +576,10 @@ document.getElementById('enc-file').addEventListener('change', async e => {
   s.className = 'status-box'; s.textContent = '';
 });
 
+['enc-text', 'enc-zones', 'enc-ecc'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateEncodeCharCounter);
+});
+
 document.getElementById('dec-file').addEventListener('change', async e => {
   if (!e.target.files[0]) return;
   await loadFileToCanvas(e.target.files[0], 'dec-canvas', 'dec-preview-wrap');
@@ -517,16 +593,28 @@ document.getElementById('dec-file').addEventListener('change', async e => {
 // Encode
 // ─────────────────────────────────────────────────────────────────────────────
 document.getElementById('btn-encode').addEventListener('click', async () => {
-  const btn    = document.getElementById('btn-encode');
-  const text   = document.getElementById('enc-text').value.trim();
-  const nZones = parseInt(document.getElementById('enc-zones').value);
-  const ecc    = parseInt(document.getElementById('enc-ecc').value);
+  const encodeButton = document.getElementById('btn-encode');
+  const {
+    messageText,
+    messageByteCount,
+    zonesPerSide,
+    errorCorrectionBytes,
+    availableCharacterEstimate
+  } = readEncodeCapacityState();
   const canvas = document.getElementById('enc-canvas');
 
   if (!canvas.width) return setStatus('enc-status', 'err', 'Load an image first.');
-  if (!text)         return setStatus('enc-status', 'err', 'Enter a message to encode.');
+  if (!messageText)  return setStatus('enc-status', 'err', 'Enter a message to encode.');
+  if (messageByteCount > availableCharacterEstimate) {
+    updateEncodeCharCounter();
+    return setStatus(
+      'enc-status',
+      'warn',
+      `Message is too long for current settings (${messageByteCount} bytes, ~${availableCharacterEstimate} available). Increase grid detail or lower error recovery strength.`
+    );
+  }
 
-  btn.disabled = true;
+  encodeButton.disabled = true;
   setStatus('enc-status', 'info', 'Encoding…');
 
   try {
@@ -537,9 +625,9 @@ document.getElementById('btn-encode').addEventListener('click', async () => {
     py.globals.set('_rgb',    origRGB);
     py.globals.set('_W',      W);
     py.globals.set('_H',      H);
-    py.globals.set('_text',   text);
-    py.globals.set('_nz',     nZones);
-    py.globals.set('_ecc',    ecc);
+    py.globals.set('_text',   messageText);
+    py.globals.set('_nz',     zonesPerSide);
+    py.globals.set('_ecc',    errorCorrectionBytes);
 
     const result = await py.runPythonAsync(`
 import numpy as np
@@ -562,7 +650,7 @@ _pixels = int(np.sum(_arr != _orig))
 
     const usePct = (100 * nBits / nTotal).toFixed(0);
     document.getElementById('enc-stats').innerHTML =
-      `${nZones}×${nZones} grid &nbsp;·&nbsp; ` +
+      `${zonesPerSide}×${zonesPerSide} grid &nbsp;·&nbsp; ` +
       `${nBits}/${nTotal} zones (${usePct}%) &nbsp;·&nbsp; ` +
       `${payloadLen} RS bytes &nbsp;·&nbsp; ` +
       `PSNR <span>${imgPsnr.toFixed(1)} dB</span> &nbsp;·&nbsp; ` +
@@ -573,7 +661,7 @@ _pixels = int(np.sum(_arr != _orig))
   } catch (e) {
     setStatus('enc-status', 'err', e.message);
   }
-  btn.disabled = false;
+  encodeButton.disabled = false;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -591,14 +679,14 @@ document.getElementById('btn-download').addEventListener('click', () => {
 // Decode
 // ─────────────────────────────────────────────────────────────────────────────
 document.getElementById('btn-decode').addEventListener('click', async () => {
-  const btn    = document.getElementById('btn-decode');
-  const nZones = parseInt(document.getElementById('dec-zones').value);
-  const ecc    = parseInt(document.getElementById('dec-ecc').value);
+  const decodeButton = document.getElementById('btn-decode');
+  const zonesPerSide = Number.parseInt(document.getElementById('dec-zones').value, 10);
+  const errorCorrectionBytes = Number.parseInt(document.getElementById('dec-ecc').value, 10);
   const canvas = document.getElementById('dec-canvas');
 
   if (!canvas.width) return setStatus('dec-status', 'err', 'Load an encoded image first.');
 
-  btn.disabled = true;
+  decodeButton.disabled = true;
   setStatus('dec-status', 'info', 'Decoding…');
   document.getElementById('dec-result').className    = 'decoded-text';
   document.getElementById('dec-label').style.display = 'none';
@@ -610,8 +698,8 @@ document.getElementById('btn-decode').addEventListener('click', async () => {
     py.globals.set('_rgb', rgb);
     py.globals.set('_W',   W);
     py.globals.set('_H',   H);
-    py.globals.set('_nz',  nZones);
-    py.globals.set('_ecc', ecc);
+    py.globals.set('_nz',  zonesPerSide);
+    py.globals.set('_ecc', errorCorrectionBytes);
 
     const t0   = performance.now();
     const text = await py.runPythonAsync(`
@@ -633,12 +721,13 @@ decode_zone(_arr, _nz, _ecc)
   } catch (e) {
     setStatus('dec-status', 'err', e.message);
   }
-  btn.disabled = false;
+  decodeButton.disabled = false;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Start
 // ─────────────────────────────────────────────────────────────────────────────
+updateEncodeCharCounter();
 boot();
 </script>
 </body>
