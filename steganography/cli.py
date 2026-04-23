@@ -31,7 +31,9 @@ import sys
 from .encoder import encode
 from .decoder import decode
 from .lsb     import encode_lsb,  decode_lsb
-from .zone    import encode_zone, decode_zone, DEFAULT_N_ZONES, DEFAULT_ECC_ZONE
+from .zone    import (encode_zone, decode_zone, DEFAULT_N_ZONES, DEFAULT_ECC_ZONE,
+                      encode_zone_tiled, decode_zone_tiled,
+                      DEFAULT_TILE_PX, DEFAULT_TILE_ECC)
 from .utils   import DEFAULT_CELL_SIZE, DEFAULT_STRENGTH, DEFAULT_ECC_NSYM, ensure_png_path
 
 
@@ -58,6 +60,16 @@ def _add_zone_args(p: argparse.ArgumentParser) -> None:
         '--n-zones', type=int, default=DEFAULT_N_ZONES, metavar='N',
         help=f'[zone mode] Grid size: N x N zones (default: {DEFAULT_N_ZONES}). '
              'Use 32 for 1024px+ images.  Must match at decode time.',
+    )
+    p.add_argument(
+        '--tiled', action='store_true',
+        help='[zone mode] Embed data in every tile_px×tile_px block for crop resilience. '
+             'Survives any crop that retains a complete tile.',
+    )
+    p.add_argument(
+        '--tile-px', type=int, default=DEFAULT_TILE_PX, metavar='N',
+        help=f'[zone --tiled] Tile size in pixels (default: {DEFAULT_TILE_PX}). '
+             'The image must be at least this size (in each dimension) after cropping.',
     )
 
 
@@ -101,7 +113,9 @@ def _ecc(args, mode: str) -> int:
     """Return ecc_nsym: explicit flag wins, otherwise mode-appropriate default."""
     if args.ecc_nsym is not None:
         return args.ecc_nsym
-    return DEFAULT_ECC_ZONE if mode == 'zone' else DEFAULT_ECC_NSYM
+    if mode == 'zone':
+        return DEFAULT_TILE_ECC if getattr(args, 'tiled', False) else DEFAULT_ECC_ZONE
+    return DEFAULT_ECC_NSYM
 
 
 def main() -> None:
@@ -122,14 +136,24 @@ def main() -> None:
                     debug       = args.debug,
                 )
             elif mode == 'zone':
-                encode_zone(
-                    image_path  = args.input,
-                    text        = args.text,
-                    output_path = ensure_png_path(args.output),
-                    n_zones     = args.n_zones,
-                    ecc_nsym    = ecc,
-                    debug       = args.debug,
-                )
+                if args.tiled:
+                    encode_zone_tiled(
+                        image_path  = args.input,
+                        text        = args.text,
+                        output_path = ensure_png_path(args.output),
+                        tile_px     = args.tile_px,
+                        n_zones     = args.n_zones,
+                        ecc_nsym    = ecc,
+                    )
+                else:
+                    encode_zone(
+                        image_path  = args.input,
+                        text        = args.text,
+                        output_path = ensure_png_path(args.output),
+                        n_zones     = args.n_zones,
+                        ecc_nsym    = ecc,
+                        debug       = args.debug,
+                    )
             else:  # grid
                 encode(
                     image_path  = args.input,
@@ -150,12 +174,20 @@ def main() -> None:
                     debug      = args.debug,
                 )
             elif mode == 'zone':
-                text = decode_zone(
-                    image_path = args.input,
-                    n_zones    = args.n_zones,
-                    ecc_nsym   = ecc,
-                    debug      = args.debug,
-                )
+                if args.tiled:
+                    text = decode_zone_tiled(
+                        image_path = args.input,
+                        tile_px    = args.tile_px,
+                        n_zones    = args.n_zones,
+                        ecc_nsym   = ecc,
+                    )
+                else:
+                    text = decode_zone(
+                        image_path = args.input,
+                        n_zones    = args.n_zones,
+                        ecc_nsym   = ecc,
+                        debug      = args.debug,
+                    )
             else:  # grid
                 text = decode(
                     image_path = args.input,
