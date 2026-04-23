@@ -137,11 +137,15 @@ def _write_bit(arr: np.ndarray, r0, r1, c0, c1, bit: int, rng) -> None:
 # ── Capacity helper ───────────────────────────────────────────────────────────
 
 def capacity_chars(n_zones: int, ecc_nsym: int) -> int:
-    """Maximum encodable characters for the given grid and ECC parameters."""
+    """Maximum encodable characters for the given grid and ECC parameters.
+
+    Zones hold the full RS-encoded blob (original_data + ecc_parity bytes).
+    Subtracting ecc_nsym recovers how many bytes are available for original data.
+    """
     total_bits  = n_zones * n_zones
-    data_bits   = total_bits - HEADER_BITS
-    data_bytes  = data_bits // 8
-    return max(0, data_bytes - ecc_nsym)
+    data_bits   = total_bits - HEADER_BITS   # bits remaining after header
+    rs_payload_bytes = data_bits // 8        # total bytes the zones can carry (data + parity)
+    return max(0, rs_payload_bytes - ecc_nsym)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
