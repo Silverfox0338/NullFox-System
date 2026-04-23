@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NullFox Steganography</title>
+<style>
+  :root {
+    --bg:       #0d0d0d;
+    --surface:  #161616;
+    --border:   #2a2a2a;
+    --accent:   #7c5cfc;
+    --accent2:  #5ce6fc;
+    --text:     #e8e8e8;
+    --muted:    #666;
+    --green:    #4ade80;
+    --red:      #f87171;
+    --yellow:   #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.6; min-height: 100vh;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .5px; }
+  header .tag {
+    font-size: 11px; color: var(--muted); font-family: monospace;
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 2px 8px; border-radius: 4px;
+  }
+
+  #boot {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: 70vh; gap: 16px;
+    color: var(--muted);
+  }
+  #boot .spinner {
+    width: 36px; height: 36px; border: 3px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #boot-msg { font-size: 13px; }
+
+  main {
+    display: none;                        /* shown after Pyodide loads */
+    grid-template-columns: 1fr 1fr;
+    gap: 1px; background: var(--border);
+    min-height: calc(100vh - 57px);
+  }
+  .panel {
+    background: var(--bg); padding: 28px 32px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .panel h2 {
+    font-size: .85rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--muted);
+  }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: 10px;
+    padding: 32px; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s; position: relative;
+  }
+  .drop-zone:hover, .drop-zone.over {
+    border-color: var(--accent); background: rgba(124,92,252,.06);
+  }
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  }
+  .drop-zone .hint { color: var(--muted); font-size: 13px; }
+  .drop-zone .hint strong { color: var(--accent); }
+
+  /* Canvas preview */
+  .preview-wrap {
+    position: relative; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; min-height: 80px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .preview-wrap canvas {
+    max-width: 100%; max-height: 340px;
+    display: block; image-rendering: pixelated;
+  }
+  .preview-wrap .placeholder {
+    color: var(--muted); font-size: 12px; padding: 24px;
+  }
+
+  /* Controls */
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  textarea, input[type=text], input[type=number] {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); padding: 9px 12px;
+    font-family: inherit; font-size: 13px; resize: vertical;
+    transition: border-color .2s; outline: none;
+  }
+  textarea { min-height: 90px; }
+  textarea:focus, input:focus { border-color: var(--accent); }
+
+  .row { display: flex; gap: 12px; }
+  .row > * { flex: 1; }
+
+  button {
+    padding: 9px 18px; border: none; border-radius: 7px;
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s;
+  }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { opacity: .88; }
+  .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--accent); }
+
+  .btn-row { display: flex; gap: 10px; }
+
+  /* Status / result boxes */
+  .status-box {
+    border-radius: 7px; padding: 10px 14px; font-size: 12px;
+    font-family: monospace; border: 1px solid transparent;
+    display: none;
+  }
+  .status-box.info  { background: rgba(124,92,252,.12); border-color: rgba(124,92,252,.3); color: var(--accent); }
+  .status-box.ok    { background: rgba(74,222,128,.1);  border-color: rgba(74,222,128,.3); color: var(--green); }
+  .status-box.err   { background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.3); color: var(--red); }
+  .status-box.warn  { background: rgba(251,191,36,.1);  border-color: rgba(251,191,36,.3);  color: var(--yellow); }
+  .status-box.show  { display: block; }
+
+  .decoded-text {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 7px; padding: 14px; font-family: monospace;
+    white-space: pre-wrap; word-break: break-all;
+    font-size: 13px; display: none; max-height: 200px; overflow-y: auto;
+  }
+  .decoded-text.show { display: block; }
+
+  .stats { font-size: 11px; color: var(--muted); }
+  .stats span { color: var(--text); }
+
+  /* Drag-and-drop highlight */
+  body.dragging .drop-zone { border-color: var(--accent2); }
+
+  @media (max-width: 700px) {
+    main { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>NullFox Steganography</h1>
+  <span class="tag">zone mode</span>
+  <span class="tag" id="pyver">loading…</span>
+</header>
+
+<!-- Loading screen -->
+<div id="boot">
+  <div class="spinner"></div>
+  <div id="boot-msg">Loading Python runtime (Pyodide)…</div>
+</div>
+
+<!-- Main UI -->
+<main id="main">
+
+  <!-- ── ENCODE ── -->
+  <div class="panel">
+    <h2>Encode</h2>
+
+    <div>
+      <label>Carrier image (PNG recommended)</label>
+      <div class="drop-zone" id="enc-drop">
+        <input type="file" id="enc-file" accept="image/*">
+        <div class="hint">Drop image here or <strong>click to browse</strong></div>
+      </div>
+    </div>
+
+    <div class="preview-wrap" id="enc-preview-wrap">
+      <div class="placeholder">No image loaded</div>
+      <canvas id="enc-canvas" style="display:none"></canvas>
+    </div>
+
+    <div>
+      <label>Message to hide</label>
+      <textarea id="enc-text" placeholder="Type your secret message…"></textarea>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Zones per side (n_zones)</label>
+        <input type="number" id="enc-zones" value="32" min="8" max="64" step="8">
+      </div>
+      <div>
+        <label>ECC parity bytes (ecc_nsym)</label>
+        <input type="number" id="enc-ecc" value="40" min="10" max="120">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-primary" id="btn-encode" disabled>Encode</button>
+      <button class="btn-secondary" id="btn-download" disabled>Download PNG</button>
+    </div>
+
+    <div class="status-box" id="enc-status"></div>
+    <div class="stats" id="enc-stats"></div>
+  </div>
+
+  <!-- ── DECODE ── -->
+  <div class="panel">
+    <h2>Decode</h2>
+
+    <div>
+      <label>Encoded image (must be PNG, same dimensions as encoded)</label>
+      <div class="drop-zone" id="dec-drop">
+        <input type="file" id="dec-file" accept="image/png,image/*">
+        <div class="hint">Drop encoded PNG here or <strong>click to browse</strong></div>
+      </div>
+    </div>
+
+    <div class="preview-wrap" id="dec-preview-wrap">
+      <div class="placeholder">No image loaded</div>
+      <canvas id="dec-canvas" style="display:none"></canvas>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Zones per side (must match encode)</label>
+        <input type="number" id="dec-zones" value="32" min="8" max="64" step="8">
+      </div>
+      <div>
+        <label>ECC parity bytes (must match encode)</label>
+        <input type="number" id="dec-ecc" value="40" min="10" max="120">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-primary" id="btn-decode" disabled>Decode</button>
+    </div>
+
+    <div class="status-box" id="dec-status"></div>
+
+    <div>
+      <label id="dec-label" style="display:none">Recovered message</label>
+      <div class="decoded-text" id="dec-result"></div>
+    </div>
+
+    <div class="stats" id="dec-stats"></div>
+  </div>
+
+</main>
+
+<!-- Pyodide -->
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.3/full/pyodide.js"></script>
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// Python source (zone encoding + all dependencies, single-file, no pkg imports)
+// ─────────────────────────────────────────────────────────────────────────────
+const PY_CODE = String.raw`
+import struct, numpy as np, reedsolo as _rs
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+MAGIC        = b'\xAB\xCD'
+HEADER_BYTES = 4
+HEADER_BITS  = 32
+
+# ── Reed-Solomon ──────────────────────────────────────────────────────────────
+def rs_encode(data, nsym):
+    return bytes(_rs.RSCodec(nsym).encode(data))
+
+def rs_decode(payload, nsym):
+    dec, _, _ = _rs.RSCodec(nsym).decode(payload)
+    return bytes(dec)
+
+# ── Bit helpers ───────────────────────────────────────────────────────────────
+def bytes_to_bits(data):
+    bits = []
+    for b in data:
+        for s in range(7, -1, -1):
+            bits.append((b >> s) & 1)
+    return bits
+
+def bits_to_bytes(bits):
+    out = bytearray()
+    for i in range(0, len(bits), 8):
+        chunk = bits[i:i+8] + [0]*(8-len(bits[i:i+8]))
+        out.append(sum(b << (7-j) for j,b in enumerate(chunk)))
+    return bytes(out)
+
+# ── Header ────────────────────────────────────────────────────────────────────
+def pack_header(length):
+    return MAGIC + struct.pack('>H', length)
+
+def unpack_header(hdr):
+    if hdr[:2] != MAGIC:
+        raise ValueError('Magic mismatch — image may not be encoded')
+    return struct.unpack('>H', hdr[2:4])[0]
+
+# ── Zone geometry ─────────────────────────────────────────────────────────────
+def zone_bounds(H, W, n, row, col):
+    r0 = round(row/n * H);  r1 = round((row+1)/n * H)
+    c0 = round(col/n * W);  c1 = round((col+1)/n * W)
+    return r0, r1, c0, c1
+
+def mean_lum(arr, r0, r1, c0, c1):
+    z = arr[r0:r1, c0:c1].astype(np.float32)
+    return float(np.mean(0.299*z[:,:,0] + 0.587*z[:,:,1] + 0.114*z[:,:,2]))
+
+# round-half-up (matches JavaScript Math.round)
+def _round(x):
+    return int(x + 0.5)
+
+def read_bit(arr, r0, r1, c0, c1):
+    return _round(mean_lum(arr, r0, r1, c0, c1)) % 2
+
+def write_bit(arr, r0, r1, c0, c1, bit, rng):
+    zone  = arr[r0:r1, c0:c1].astype(np.float32)
+    h, w  = zone.shape[:2]
+    n_px  = h * w
+    if n_px == 0: return
+
+    lum  = 0.299*zone[:,:,0] + 0.587*zone[:,:,1] + 0.114*zone[:,:,2]
+    mean = float(np.mean(lum))
+    q    = _round(mean)
+
+    if q % 2 == bit: return
+
+    q_up, q_dn = q+1, q-1
+    target    = q_up if abs(q_up-mean) <= abs(q_dn-mean) else q_dn
+    delta     = target - mean
+    direction = 1 if delta > 0 else -1
+    n_change  = min(n_px, round(abs(delta) * n_px))
+    if n_change == 0: return
+
+    idx  = rng.choice(n_px, size=n_change, replace=False)
+    flat = zone.reshape(-1, 3)
+    flat[idx] = np.clip(flat[idx] + direction, 0, 255)
+    arr[r0:r1, c0:c1] = flat.reshape(h, w, 3).astype(np.uint8)
+
+# ── Encode ────────────────────────────────────────────────────────────────────
+def encode_zone(arr, text, n_zones, ecc_nsym):
+    H, W     = arr.shape[:2]
+    payload  = rs_encode(text.encode('utf-8'), ecc_nsym)
+    all_bits = bytes_to_bits(pack_header(len(payload))) + bytes_to_bits(payload)
+    n_bits   = len(all_bits)
+    n_total  = n_zones * n_zones
+
+    if n_bits > n_total:
+        raise ValueError(
+            f'Message too long: need {n_bits} zones, have {n_total}. '
+            f'Use a larger n_zones or shorter message.'
+        )
+
+    rng = np.random.default_rng(0)
+    idx = 0
+    for row in range(n_zones):
+        for col in range(n_zones):
+            if idx >= n_bits: break
+            write_bit(arr, *zone_bounds(H, W, n_zones, row, col), all_bits[idx], rng)
+            idx += 1
+
+    return arr, len(payload), n_bits, n_total
+
+# ── Decode ────────────────────────────────────────────────────────────────────
+def decode_zone(arr, n_zones, ecc_nsym):
+    H, W = arr.shape[:2]
+    it   = ((r, c) for r in range(n_zones) for c in range(n_zones))
+
+    hbits = [read_bit(arr, *zone_bounds(H, W, n_zones, *next(it))) for _ in range(HEADER_BITS)]
+    payload_len = unpack_header(bits_to_bytes(hbits))
+
+    pbits = [read_bit(arr, *zone_bounds(H, W, n_zones, *next(it))) for _ in range(payload_len * 8)]
+    return rs_decode(bits_to_bytes(pbits), ecc_nsym).decode('utf-8')
+
+# ── PSNR helper (for stats display) ──────────────────────────────────────────
+def psnr(orig, enc):
+    mse = float(np.mean((orig.astype(np.float32) - enc.astype(np.float32))**2))
+    if mse == 0: return float('inf')
+    return 10 * np.log10(255**2 / mse)
+`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pyodide bootstrap
+// ─────────────────────────────────────────────────────────────────────────────
+let py = null;
+
+async function boot() {
+  const msg = document.getElementById('boot-msg');
+  try {
+    msg.textContent = 'Loading Pyodide runtime…';
+    py = await loadPyodide();
+
+    msg.textContent = 'Loading numpy…';
+    await py.loadPackage('numpy');
+
+    msg.textContent = 'Installing reedsolo via micropip…';
+    await py.loadPackage('micropip');
+    await py.runPythonAsync(`
+      import micropip
+      await micropip.install('reedsolo')
+    `);
+
+    msg.textContent = 'Initialising steganography engine…';
+    await py.runPythonAsync(PY_CODE);
+
+    document.getElementById('pyver').textContent =
+      py.runPython('import sys; sys.version.split()[0]');
+
+    document.getElementById('boot').style.display  = 'none';
+    document.getElementById('main').style.display  = 'grid';
+
+    document.getElementById('btn-encode').disabled = false;
+    document.getElementById('btn-decode').disabled = false;
+  } catch (e) {
+    msg.innerHTML = `<span style="color:#f87171">Failed to load: ${e.message}</span>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Image helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function loadFileToCanvas(file, canvasId, previewWrapId) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.getElementById(canvasId);
+        canvas.width  = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        canvas.style.display = 'block';
+        document.querySelector(`#${previewWrapId} .placeholder`).style.display = 'none';
+        resolve({ canvas, img });
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function canvasToRGBArray(canvas) {
+  const ctx  = canvas.getContext('2d');
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data; // RGBA
+  // Strip alpha: interleave R,G,B only
+  const rgb  = new Uint8Array(canvas.width * canvas.height * 3);
+  for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+    rgb[j]   = data[i];
+    rgb[j+1] = data[i+1];
+    rgb[j+2] = data[i+2];
+  }
+  return rgb;
+}
+
+function rgbArrayToCanvas(rgb, W, H, canvas) {
+  const ctx     = canvas.getContext('2d');
+  const imgData = ctx.createImageData(W, H);
+  for (let i = 0, j = 0; j < rgb.length; i += 4, j += 3) {
+    imgData.data[i]   = rgb[j];
+    imgData.data[i+1] = rgb[j+1];
+    imgData.data[i+2] = rgb[j+2];
+    imgData.data[i+3] = 255;
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function setStatus(id, cls, msg) {
+  const el = document.getElementById(id);
+  el.className = `status-box ${cls} show`;
+  el.textContent = msg;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// File drag-and-drop polish
+// ─────────────────────────────────────────────────────────────────────────────
+['enc-drop', 'dec-drop'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('dragover',  e => { e.preventDefault(); el.classList.add('over'); });
+  el.addEventListener('dragleave', ()  => el.classList.remove('over'));
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.classList.remove('over');
+    const input = el.querySelector('input[type=file]');
+    // Trigger our change handler with the dropped file
+    const dt  = new DataTransfer();
+    dt.items.add(e.dataTransfer.files[0]);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  });
+});
+
+// Auto-preview on file select
+document.getElementById('enc-file').addEventListener('change', async e => {
+  if (!e.target.files[0]) return;
+  await loadFileToCanvas(e.target.files[0], 'enc-canvas', 'enc-preview-wrap');
+  document.getElementById('enc-stats').textContent = '';
+  document.getElementById('btn-download').disabled = true;
+  const s = document.getElementById('enc-status');
+  s.className = 'status-box'; s.textContent = '';
+});
+
+document.getElementById('dec-file').addEventListener('change', async e => {
+  if (!e.target.files[0]) return;
+  await loadFileToCanvas(e.target.files[0], 'dec-canvas', 'dec-preview-wrap');
+  document.getElementById('dec-result').className = 'decoded-text';
+  document.getElementById('dec-label').style.display = 'none';
+  const s = document.getElementById('dec-status');
+  s.className = 'status-box'; s.textContent = '';
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Encode
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById('btn-encode').addEventListener('click', async () => {
+  const btn    = document.getElementById('btn-encode');
+  const text   = document.getElementById('enc-text').value.trim();
+  const nZones = parseInt(document.getElementById('enc-zones').value);
+  const ecc    = parseInt(document.getElementById('enc-ecc').value);
+  const canvas = document.getElementById('enc-canvas');
+
+  if (!canvas.width) return setStatus('enc-status', 'err', 'Load an image first.');
+  if (!text)         return setStatus('enc-status', 'err', 'Enter a message to encode.');
+
+  btn.disabled = true;
+  setStatus('enc-status', 'info', 'Encoding…');
+
+  try {
+    const origRGB = canvasToRGBArray(canvas);
+    const W = canvas.width, H = canvas.height;
+
+    // Pass raw bytes to Python
+    py.globals.set('_rgb',    origRGB);
+    py.globals.set('_W',      W);
+    py.globals.set('_H',      H);
+    py.globals.set('_text',   text);
+    py.globals.set('_nz',     nZones);
+    py.globals.set('_ecc',    ecc);
+
+    const result = await py.runPythonAsync(`
+import numpy as np
+_arr    = np.frombuffer(bytes(_rgb), dtype=np.uint8).reshape(_H, _W, 3).copy()
+_orig   = _arr.copy()
+_arr, _payload_len, _n_bits, _n_total = encode_zone(_arr, _text, _nz, _ecc)
+_psnr   = psnr(_orig, _arr)
+_pixels = int(np.sum(_arr != _orig))
+(_arr.flatten().tolist(), _payload_len, _n_bits, _n_total, _psnr, _pixels)
+`);
+
+    const [flatList, payloadLen, nBits, nTotal, imgPsnr, pixelsChanged] = result.toJs();
+    const encoded = new Uint8Array(flatList);
+
+    rgbArrayToCanvas(encoded, W, H, canvas);
+
+    // Store for download
+    canvas._encodedData = encoded;
+    canvas._W = W; canvas._H = H;
+
+    const usePct = (100 * nBits / nTotal).toFixed(0);
+    document.getElementById('enc-stats').innerHTML =
+      `${nZones}×${nZones} grid &nbsp;·&nbsp; ` +
+      `${nBits}/${nTotal} zones (${usePct}%) &nbsp;·&nbsp; ` +
+      `${payloadLen} RS bytes &nbsp;·&nbsp; ` +
+      `PSNR <span>${imgPsnr.toFixed(1)} dB</span> &nbsp;·&nbsp; ` +
+      `${pixelsChanged.toLocaleString()} px changed (max delta 1)`;
+
+    setStatus('enc-status', 'ok', 'Encoded. Download the PNG to preserve data.');
+    document.getElementById('btn-download').disabled = false;
+  } catch (e) {
+    setStatus('enc-status', 'err', e.message);
+  }
+  btn.disabled = false;
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Download
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById('btn-download').addEventListener('click', () => {
+  const canvas = document.getElementById('enc-canvas');
+  const link   = document.createElement('a');
+  link.download = 'encoded.png';
+  link.href     = canvas.toDataURL('image/png');
+  link.click();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Decode
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById('btn-decode').addEventListener('click', async () => {
+  const btn    = document.getElementById('btn-decode');
+  const nZones = parseInt(document.getElementById('dec-zones').value);
+  const ecc    = parseInt(document.getElementById('dec-ecc').value);
+  const canvas = document.getElementById('dec-canvas');
+
+  if (!canvas.width) return setStatus('dec-status', 'err', 'Load an encoded image first.');
+
+  btn.disabled = true;
+  setStatus('dec-status', 'info', 'Decoding…');
+  document.getElementById('dec-result').className    = 'decoded-text';
+  document.getElementById('dec-label').style.display = 'none';
+
+  try {
+    const rgb = canvasToRGBArray(canvas);
+    const W   = canvas.width, H = canvas.height;
+
+    py.globals.set('_rgb', rgb);
+    py.globals.set('_W',   W);
+    py.globals.set('_H',   H);
+    py.globals.set('_nz',  nZones);
+    py.globals.set('_ecc', ecc);
+
+    const t0   = performance.now();
+    const text = await py.runPythonAsync(`
+import numpy as np
+_arr = np.frombuffer(bytes(_rgb), dtype=np.uint8).reshape(_H, _W, 3).copy()
+decode_zone(_arr, _nz, _ecc)
+`);
+    const ms = (performance.now() - t0).toFixed(0);
+
+    const resultEl = document.getElementById('dec-result');
+    resultEl.textContent = text;
+    resultEl.className   = 'decoded-text show';
+    document.getElementById('dec-label').style.display = 'block';
+
+    document.getElementById('dec-stats').textContent =
+      `Decoded ${text.length} chars in ${ms} ms`;
+
+    setStatus('dec-status', 'ok', 'Decoded successfully.');
+  } catch (e) {
+    setStatus('dec-status', 'err', e.message);
+  }
+  btn.disabled = false;
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Start
+// ─────────────────────────────────────────────────────────────────────────────
+boot();
+</script>
+</body>
+</html>
