@@ -6,13 +6,15 @@
 <title>NullFox Steganography</title>
 <style>
   :root {
-    --bg:       #0d0d0d;
-    --surface:  #161616;
-    --border:   #2a2a2a;
-    --accent:   #7c5cfc;
-    --accent2:  #5ce6fc;
-    --text:     #e8e8e8;
-    --muted:    #666;
+    --bg:       #080610;
+    --surface:  #110e1e;
+    --surface2: #1c1830;
+    --border:   #2e2550;
+    --accent:   #9b4dff;
+    --accent2:  #c97fff;
+    --aglow:    rgba(155,77,255,.14);
+    --text:     #ede9f8;
+    --muted:    #6b5a8c;
     --green:    #4ade80;
     --red:      #f87171;
     --yellow:   #fbbf24;
@@ -24,382 +26,741 @@
     font-size: 14px; line-height: 1.6; min-height: 100vh;
   }
 
+  /* Header */
   header {
-    border-bottom: 1px solid var(--border);
-    padding: 18px 32px;
-    display: flex; align-items: center; gap: 14px;
+    border-bottom: 1px solid var(--border); padding: 11px 24px;
+    display: flex; align-items: center; gap: 18px;
+    background: var(--surface); position: sticky; top: 0; z-index: 10;
   }
-  header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .5px; }
-  header .tag {
-    font-size: 11px; color: var(--muted); font-family: monospace;
-    background: var(--surface); border: 1px solid var(--border);
-    padding: 2px 8px; border-radius: 4px;
-  }
+  .logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .logo-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .logo h1 { font-size: .95rem; font-weight: 700; white-space: nowrap; }
 
-  #boot {
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; min-height: 70vh; gap: 16px;
-    color: var(--muted);
+  .mode-tabs { display: flex; gap: 3px; }
+  .mode-tab {
+    background: none; border: 1px solid transparent;
+    color: var(--muted); font-size: 12px; font-weight: 500;
+    padding: 5px 14px; border-radius: 6px; cursor: pointer;
+    transition: all .15s; white-space: nowrap;
   }
-  #boot .spinner {
-    width: 36px; height: 36px; border: 3px solid var(--border);
-    border-top-color: var(--accent); border-radius: 50%;
-    animation: spin .8s linear infinite;
-  }
+  .mode-tab:hover { color: var(--text); border-color: var(--border); }
+  .mode-tab.active { background: var(--aglow); color: var(--accent2); border-color: var(--accent); font-weight: 600; }
+
+  .hend { margin-left: auto; }
+  .tag { font-size: 11px; color: var(--muted); font-family: monospace; background: var(--bg); border: 1px solid var(--border); padding: 2px 8px; border-radius: 4px; }
+
+  /* Boot */
+  #boot { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 75vh; gap: 14px; color: var(--muted); }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  #boot-msg { font-size: 13px; }
 
-  main {
-    display: none;                        /* shown after Pyodide loads */
-    grid-template-columns: 1fr 1fr;
-    gap: 1px; background: var(--border);
-    min-height: calc(100vh - 57px);
-  }
-  .panel {
-    background: var(--bg); padding: 28px 32px;
-    display: flex; flex-direction: column; gap: 18px;
-  }
-  .panel h2 {
-    font-size: .85rem; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 1.5px; color: var(--muted);
-  }
+  /* Main */
+  main { display: none; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); min-height: calc(100vh - 51px); }
+  .panel { background: var(--bg); padding: 22px 26px; display: flex; flex-direction: column; gap: 14px; }
+  .panel-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+
+  /* Mode desc */
+  .mode-desc { font-size: 11.5px; color: var(--muted); line-height: 1.5; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; }
+  .mode-desc strong { color: var(--accent2); }
 
   /* Drop zone */
-  .drop-zone {
-    border: 2px dashed var(--border); border-radius: 10px;
-    padding: 32px; text-align: center; cursor: pointer;
-    transition: border-color .2s, background .2s; position: relative;
-  }
-  .drop-zone:hover, .drop-zone.over {
-    border-color: var(--accent); background: rgba(124,92,252,.06);
-  }
-  .drop-zone input[type=file] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer;
-  }
-  .drop-zone .hint { color: var(--muted); font-size: 13px; }
-  .drop-zone .hint strong { color: var(--accent); }
+  .drop-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 18px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; position: relative; }
+  .drop-zone:hover, .drop-zone.over { border-color: var(--accent); background: var(--aglow); }
+  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop-zone .hint { color: var(--muted); font-size: 12px; }
+  .drop-zone .hint strong { color: var(--accent2); }
+  .file-name { font-size: 11px; color: var(--muted); margin-top: 3px; font-family: monospace; display: none; }
 
-  /* Canvas preview */
-  .preview-wrap {
-    position: relative; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 8px;
-    overflow: hidden; min-height: 80px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .preview-wrap canvas {
-    max-width: 100%; max-height: 340px;
-    display: block; image-rendering: pixelated;
-  }
-  .preview-wrap .placeholder {
-    color: var(--muted); font-size: 12px; padding: 24px;
-  }
+  /* Preview */
+  .preview-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; min-height: 72px; display: flex; align-items: center; justify-content: center; }
+  .preview-wrap canvas { max-width: 100%; max-height: 260px; display: block; image-rendering: pixelated; }
+  .placeholder { color: var(--muted); font-size: 12px; padding: 16px; }
 
-  /* Controls */
-  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
-  textarea, input[type=text], input[type=number] {
-    width: 100%; background: var(--surface); border: 1px solid var(--border);
-    border-radius: 6px; color: var(--text); padding: 9px 12px;
-    font-family: inherit; font-size: 13px; resize: vertical;
-    transition: border-color .2s; outline: none;
-  }
-  textarea { min-height: 90px; }
+  /* Form */
+  label { display: block; font-size: 10.5px; color: var(--muted); margin-bottom: 4px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+  textarea, input[type=number] { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 8px 11px; font-family: inherit; font-size: 13px; resize: vertical; transition: border-color .2s; outline: none; }
+  textarea { min-height: 78px; }
   textarea:focus, input:focus { border-color: var(--accent); }
+  input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; appearance: none; }
 
-  .row { display: flex; gap: 12px; }
-  .row > * { flex: 1; }
+  .pgrid  { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pgrid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .psolo  { max-width: 190px; }
 
-  button {
-    padding: 9px 18px; border: none; border-radius: 7px;
-    font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s;
-  }
-  button:disabled { opacity: .35; cursor: not-allowed; }
+  /* Buttons */
+  .btn-row { display: flex; gap: 8px; }
+  button { padding: 8px 18px; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+  button:disabled { opacity: .3; cursor: not-allowed; }
   .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover:not(:disabled) { opacity: .88; }
-  .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
-  .btn-secondary:hover:not(:disabled) { border-color: var(--accent); }
+  .btn-primary:hover:not(:disabled) { background: var(--accent2); box-shadow: 0 0 14px var(--aglow); }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
 
-  .btn-row { display: flex; gap: 10px; }
-
-  /* Status / result boxes */
-  .status-box {
-    border-radius: 7px; padding: 10px 14px; font-size: 12px;
-    font-family: monospace; border: 1px solid transparent;
-    display: none;
-  }
-  .status-box.info  { background: rgba(124,92,252,.12); border-color: rgba(124,92,252,.3); color: var(--accent); }
-  .status-box.ok    { background: rgba(74,222,128,.1);  border-color: rgba(74,222,128,.3); color: var(--green); }
-  .status-box.err   { background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.3); color: var(--red); }
-  .status-box.warn  { background: rgba(251,191,36,.1);  border-color: rgba(251,191,36,.3);  color: var(--yellow); }
+  /* Status */
+  .status-box { border-radius: 7px; padding: 9px 13px; font-size: 12px; font-family: monospace; border: 1px solid transparent; display: none; line-height: 1.5; }
   .status-box.show  { display: block; }
+  .status-box.info  { background: rgba(155,77,255,.08);  border-color: rgba(155,77,255,.3);  color: var(--accent2); }
+  .status-box.ok    { background: rgba(74,222,128,.07);  border-color: rgba(74,222,128,.25); color: var(--green); }
+  .status-box.err   { background: rgba(248,113,113,.07); border-color: rgba(248,113,113,.25);color: var(--red); }
+  .status-box.warn  { background: rgba(251,191,36,.07);  border-color: rgba(251,191,36,.25); color: var(--yellow); }
 
-  .decoded-text {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 7px; padding: 14px; font-family: monospace;
-    white-space: pre-wrap; word-break: break-all;
-    font-size: 13px; display: none; max-height: 200px; overflow-y: auto;
-  }
-  .decoded-text.show { display: block; }
+  /* Result */
+  .result-box { background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 12px; font-family: monospace; white-space: pre-wrap; word-break: break-all; font-size: 12.5px; display: none; max-height: 180px; overflow-y: auto; }
+  .result-box.show { display: block; }
 
-  .stats { font-size: 11px; color: var(--muted); }
-  .stats span { color: var(--text); }
-
-  .input-hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
-
-  .char-counter {
-    font-size: 12px; text-align: right; margin-top: 5px;
-    color: var(--muted); font-family: monospace; transition: color .2s;
-  }
+  /* Counter / stats */
+  .char-counter { font-size: 11px; text-align: right; margin-top: 4px; color: var(--muted); font-family: monospace; }
   .char-counter.ok   { color: var(--green); }
   .char-counter.warn { color: var(--yellow); }
-  .char-counter.over { color: var(--red); font-weight: 600; }
-
-  /* Drag-and-drop highlight */
-  body.dragging .drop-zone { border-color: var(--accent2); }
+  .char-counter.over { color: var(--red); font-weight: 700; }
+  .stats { font-size: 11px; color: var(--muted); font-family: monospace; line-height: 2; }
+  .stats .v { color: var(--text); }
 
   @media (max-width: 700px) {
     main { grid-template-columns: 1fr; }
+    .mode-tabs { overflow-x: auto; }
+    .pgrid3 { grid-template-columns: 1fr 1fr; }
   }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>NullFox Steganography</h1>
-  <span class="tag">zone mode</span>
-  <span class="tag" id="pyver">loading…</span>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <h1>NullFox Steganography</h1>
+  </div>
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="lsb">LSB</button>
+    <button class="mode-tab" data-mode="zone">Zone</button>
+    <button class="mode-tab" data-mode="zone-tiled">Zone Tiled</button>
+    <button class="mode-tab" data-mode="grid">Grid</button>
+  </div>
+  <div class="hend"><span class="tag" id="pyver">loading…</span></div>
 </header>
 
-<!-- Loading screen -->
 <div id="boot">
   <div class="spinner"></div>
-  <div id="boot-msg">Loading Python runtime (Pyodide)…</div>
+  <div id="boot-msg">Loading Python runtime…</div>
 </div>
 
-<!-- Main UI -->
 <main id="main">
 
-  <!-- ── ENCODE ── -->
+  <!-- ══ ENCODE ══ -->
   <div class="panel">
-    <h2>Encode</h2>
+    <div class="panel-title">Encode</div>
+
+    <div class="mode-section mode-desc" data-mode="lsb"><strong>LSB</strong> — hides payload bits in the blue-channel LSB of permuted pixels. PSNR ~82 dB, virtually invisible. Capacity scales with resolution. PNG only.</div>
+    <div class="mode-section mode-desc" data-mode="zone" style="display:none"><strong>Zone</strong> — N×N grid; each zone's mean-luminance parity encodes one bit. Survives proportional resize. PNG only.</div>
+    <div class="mode-section mode-desc" data-mode="zone-tiled" style="display:none"><strong>Zone Tiled</strong> — stamps the same message into every tile. Survives arbitrary crops as long as one complete tile remains. PNG only.</div>
+    <div class="mode-section mode-desc" data-mode="grid" style="display:none"><strong>Grid</strong> — fixed-cell luminance quantisation with corner alignment markers. Tolerates light JPEG (quality ≥ 75).</div>
 
     <div>
-      <label>Carrier image (PNG recommended)</label>
+      <label>Carrier image</label>
       <div class="drop-zone" id="enc-drop">
         <input type="file" id="enc-file" accept="image/*">
         <div class="hint">Drop image here or <strong>click to browse</strong></div>
+        <div class="file-name" id="enc-fname"></div>
       </div>
     </div>
 
-    <div class="preview-wrap" id="enc-preview-wrap">
-      <div class="placeholder">No image loaded</div>
+    <div class="preview-wrap">
+      <div class="placeholder" id="enc-ph">No image loaded</div>
       <canvas id="enc-canvas" style="display:none"></canvas>
     </div>
 
     <div>
       <label>Message to hide</label>
       <textarea id="enc-text" placeholder="Type your secret message…"></textarea>
-      <div class="char-counter" id="enc-char-counter">0 / ~84 chars available</div>
-      <div class="input-hint">Live estimate from grid detail + recovery settings. Emoji/symbol-heavy text can use more space.</div>
+      <div class="char-counter" id="enc-counter">—</div>
     </div>
 
-    <div class="row">
-      <div>
-        <label>Grid detail (zones per side)</label>
-        <input type="number" id="enc-zones" value="32" min="8" max="64" step="8">
+    <div class="mode-section" data-mode="lsb">
+      <div class="psolo"><label>ECC bytes</label><input type="number" id="lsb-enc-ecc" value="20" min="4" max="120"></div>
+    </div>
+    <div class="mode-section" data-mode="zone" style="display:none">
+      <div class="pgrid">
+        <div><label>Zones per side</label><input type="number" id="zone-enc-zones" value="32" min="8" max="64" step="8"></div>
+        <div><label>ECC bytes</label><input type="number" id="zone-enc-ecc" value="40" min="4" max="120"></div>
       </div>
-      <div>
-        <label>Error recovery strength (extra correction bytes)</label>
-        <input type="number" id="enc-ecc" value="40" min="10" max="120">
+    </div>
+    <div class="mode-section" data-mode="zone-tiled" style="display:none">
+      <div class="pgrid3">
+        <div><label>Tile size (px)</label><input type="number" id="zt-enc-tile" value="256" min="64" max="1024" step="64"></div>
+        <div><label>Zones per tile</label><input type="number" id="zt-enc-zones" value="16" min="8" max="32" step="8"></div>
+        <div><label>ECC bytes</label><input type="number" id="zt-enc-ecc" value="10" min="4" max="120"></div>
+      </div>
+    </div>
+    <div class="mode-section" data-mode="grid" style="display:none">
+      <div class="pgrid3">
+        <div><label>Cell size (px)</label><input type="number" id="grid-enc-cell" value="16" min="4" max="64" step="4"></div>
+        <div><label>Strength</label><input type="number" id="grid-enc-str" value="12" min="2" max="64"></div>
+        <div><label>ECC bytes</label><input type="number" id="grid-enc-ecc" value="20" min="4" max="120"></div>
       </div>
     </div>
 
     <div class="btn-row">
-      <button class="btn-primary" id="btn-encode" disabled>Encode</button>
+      <button class="btn-primary"   id="btn-encode"   disabled>Encode</button>
       <button class="btn-secondary" id="btn-download" disabled>Download PNG</button>
     </div>
-
     <div class="status-box" id="enc-status"></div>
-    <div class="stats" id="enc-stats"></div>
+    <div class="stats"      id="enc-stats"></div>
   </div>
 
-  <!-- ── DECODE ── -->
+  <!-- ══ DECODE ══ -->
   <div class="panel">
-    <h2>Decode</h2>
+    <div class="panel-title">Decode</div>
 
     <div>
-      <label>Encoded image (must be PNG, same dimensions as encoded)</label>
+      <label>Encoded image</label>
       <div class="drop-zone" id="dec-drop">
-        <input type="file" id="dec-file" accept="image/png,image/*">
-        <div class="hint">Drop encoded PNG here or <strong>click to browse</strong></div>
+        <input type="file" id="dec-file" accept="image/*">
+        <div class="hint">Drop encoded image here or <strong>click to browse</strong></div>
+        <div class="file-name" id="dec-fname"></div>
       </div>
     </div>
 
-    <div class="preview-wrap" id="dec-preview-wrap">
-      <div class="placeholder">No image loaded</div>
+    <div class="preview-wrap">
+      <div class="placeholder" id="dec-ph">No image loaded</div>
       <canvas id="dec-canvas" style="display:none"></canvas>
     </div>
 
-    <div class="row">
-      <div>
-        <label>Grid detail (must match encode)</label>
-        <input type="number" id="dec-zones" value="32" min="8" max="64" step="8">
+    <div class="mode-section" data-mode="lsb">
+      <div class="psolo"><label>ECC bytes (must match)</label><input type="number" id="lsb-dec-ecc" value="20" min="4" max="120"></div>
+    </div>
+    <div class="mode-section" data-mode="zone" style="display:none">
+      <div class="pgrid">
+        <div><label>Zones per side (must match)</label><input type="number" id="zone-dec-zones" value="32" min="8" max="64" step="8"></div>
+        <div><label>ECC bytes (must match)</label><input type="number" id="zone-dec-ecc" value="40" min="4" max="120"></div>
       </div>
-      <div>
-        <label>Error recovery strength (must match encode)</label>
-        <input type="number" id="dec-ecc" value="40" min="10" max="120">
+    </div>
+    <div class="mode-section" data-mode="zone-tiled" style="display:none">
+      <div class="pgrid3">
+        <div><label>Tile size (must match)</label><input type="number" id="zt-dec-tile" value="256" min="64" max="1024" step="64"></div>
+        <div><label>Zones per tile (must match)</label><input type="number" id="zt-dec-zones" value="16" min="8" max="32" step="8"></div>
+        <div><label>ECC bytes (must match)</label><input type="number" id="zt-dec-ecc" value="10" min="4" max="120"></div>
+      </div>
+    </div>
+    <div class="mode-section" data-mode="grid" style="display:none">
+      <div class="pgrid3">
+        <div><label>Cell size (must match)</label><input type="number" id="grid-dec-cell" value="16" min="4" max="64" step="4"></div>
+        <div><label>Strength (must match)</label><input type="number" id="grid-dec-str" value="12" min="2" max="64"></div>
+        <div><label>ECC bytes (must match)</label><input type="number" id="grid-dec-ecc" value="20" min="4" max="120"></div>
       </div>
     </div>
 
     <div class="btn-row">
       <button class="btn-primary" id="btn-decode" disabled>Decode</button>
     </div>
-
     <div class="status-box" id="dec-status"></div>
-
-    <div>
-      <label id="dec-label" style="display:none">Recovered message</label>
-      <div class="decoded-text" id="dec-result"></div>
-    </div>
-
-    <div class="stats" id="dec-stats"></div>
+    <div class="result-box" id="dec-result"></div>
+    <div class="stats"      id="dec-stats"></div>
   </div>
 
 </main>
 
-<!-- Pyodide -->
 <script src="https://cdn.jsdelivr.net/pyodide/v0.27.3/full/pyodide.js"></script>
 <script>
-// ─────────────────────────────────────────────────────────────────────────────
-// Python source (zone encoding + all dependencies, single-file, no pkg imports)
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Python: all four steganography modes ──────────────────────────────────────
 const PY_CODE = String.raw`
 import struct, numpy as np, reedsolo as _rs
 
-# ── Constants ─────────────────────────────────────────────────────────────────
-MAGIC        = b'\xAB\xCD'
-HEADER_BYTES = 4
-HEADER_BITS  = 32
+MAGIC = b'\xAB\xCD'
+HEADER_BITS = 32
 
-# ── Reed-Solomon ──────────────────────────────────────────────────────────────
-def rs_encode(data, nsym):
-    return bytes(_rs.RSCodec(nsym).encode(data))
+def rs_enc(d, n): return bytes(_rs.RSCodec(n).encode(d))
+def rs_dec(d, n):
+    r,_,_ = _rs.RSCodec(n).decode(d); return bytes(r)
 
-def rs_decode(payload, nsym):
-    dec, _, _ = _rs.RSCodec(nsym).decode(payload)
-    return bytes(dec)
-
-# ── Bit helpers ───────────────────────────────────────────────────────────────
-def bytes_to_bits(data):
-    bits = []
+def to_bits(data):
+    out=[]
     for b in data:
-        for s in range(7, -1, -1):
-            bits.append((b >> s) & 1)
-    return bits
+        for s in range(7,-1,-1): out.append((b>>s)&1)
+    return out
 
-def bits_to_bytes(bits):
-    out = bytearray()
-    for i in range(0, len(bits), 8):
-        chunk = bits[i:i+8] + [0]*(8-len(bits[i:i+8]))
-        out.append(sum(b << (7-j) for j,b in enumerate(chunk)))
+def to_bytes(bits):
+    out=bytearray()
+    for i in range(0,len(bits),8):
+        c=bits[i:i+8]+[0]*(8-len(bits[i:i+8]))
+        out.append(sum(b<<(7-j) for j,b in enumerate(c)))
     return bytes(out)
 
-# ── Header ────────────────────────────────────────────────────────────────────
-def pack_header(length):
-    return MAGIC + struct.pack('>H', length)
+def pack_hdr(n):    return b'\xAB\xCD'+struct.pack('>H',n)
+def unpack_hdr(h):
+    if h[:2]!=b'\xAB\xCD': raise ValueError('Magic mismatch — wrong mode or not encoded')
+    return struct.unpack('>H',h[2:4])[0]
 
-def unpack_header(hdr):
-    if hdr[:2] != MAGIC:
-        raise ValueError('Magic mismatch — image may not be encoded')
-    return struct.unpack('>H', hdr[2:4])[0]
+def psnr(a,b):
+    mse=float(np.mean((a.astype(np.float32)-b.astype(np.float32))**2))
+    return float('inf') if mse==0 else 10*np.log10(255**2/mse)
 
-# ── Zone geometry ─────────────────────────────────────────────────────────────
-def zone_bounds(H, W, n, row, col):
-    r0 = round(row/n * H);  r1 = round((row+1)/n * H)
-    c0 = round(col/n * W);  c1 = round((col+1)/n * W)
-    return r0, r1, c0, c1
+# ── LSB ───────────────────────────────────────────────────────────────────────
+_LC=2; _LS=0x4E464F58
 
-def mean_lum(arr, r0, r1, c0, c1):
-    z = arr[r0:r1, c0:c1].astype(np.float32)
-    return float(np.mean(0.299*z[:,:,0] + 0.587*z[:,:,1] + 0.114*z[:,:,2]))
+def _lsb_ord(n): return np.random.default_rng(_LS).permutation(n)
 
-# round-half-up (matches JavaScript Math.round)
-def _round(x):
-    return int(x + 0.5)
+def encode_lsb(arr, text, ecc):
+    npx=arr.shape[0]*arr.shape[1]
+    pl=rs_enc(text.encode(),ecc)
+    bits=to_bits(pack_hdr(len(pl)))+to_bits(pl); nb=len(bits)
+    if nb>npx: raise ValueError(f'Too long: needs {nb} px, image has {npx}.')
+    ord_=_lsb_ord(npx)[:nb]
+    flat=arr.reshape(-1,3)
+    flat[ord_,_LC]=(flat[ord_,_LC]&0xFE)|np.array(bits,dtype=np.uint8)
+    return arr,len(pl),nb,npx
 
-def read_bit(arr, r0, r1, c0, c1):
-    return _round(mean_lum(arr, r0, r1, c0, c1)) % 2
+def decode_lsb(arr, ecc):
+    npx=arr.shape[0]*arr.shape[1]
+    ord_=_lsb_ord(npx); flat=arr.reshape(-1,3)
+    plen=unpack_hdr(to_bytes((flat[ord_[:HEADER_BITS],_LC]&1).tolist()))
+    return rs_dec(to_bytes((flat[ord_[HEADER_BITS:HEADER_BITS+plen*8],_LC]&1).tolist()),ecc).decode()
 
-def write_bit(arr, r0, r1, c0, c1, bit, rng):
-    zone  = arr[r0:r1, c0:c1].astype(np.float32)
-    h, w  = zone.shape[:2]
-    n_px  = h * w
-    if n_px == 0: return
+# ── Zone ──────────────────────────────────────────────────────────────────────
+def _zr(x): return int(x+0.5)   # round-half-up, matches JS Math.round
 
-    lum  = 0.299*zone[:,:,0] + 0.587*zone[:,:,1] + 0.114*zone[:,:,2]
-    mean = float(np.mean(lum))
-    q    = _round(mean)
+def _zb(H,W,n,row,col):
+    return round(row/n*H),round((row+1)/n*H),round(col/n*W),round((col+1)/n*W)
 
-    if q % 2 == bit: return
+def _zlum(arr,r0,r1,c0,c1):
+    z=arr[r0:r1,c0:c1].astype(np.float32)
+    return float(np.mean(0.299*z[:,:,0]+0.587*z[:,:,1]+0.114*z[:,:,2]))
 
-    q_up, q_dn = q+1, q-1
-    target    = q_up if abs(q_up-mean) <= abs(q_dn-mean) else q_dn
-    delta     = target - mean
-    direction = 1 if delta > 0 else -1
-    n_change  = min(n_px, round(abs(delta) * n_px))
-    if n_change == 0: return
+def _zread(arr,r0,r1,c0,c1): return _zr(_zlum(arr,r0,r1,c0,c1))%2
 
-    idx  = rng.choice(n_px, size=n_change, replace=False)
-    flat = zone.reshape(-1, 3)
-    flat[idx] = np.clip(flat[idx] + direction, 0, 255)
-    arr[r0:r1, c0:c1] = flat.reshape(h, w, 3).astype(np.uint8)
+def _zwrite(arr,r0,r1,c0,c1,bit,rng):
+    zone=arr[r0:r1,c0:c1].astype(np.float32); h,w=zone.shape[:2]; npx=h*w
+    if npx==0: return
+    mean=float(np.mean(0.299*zone[:,:,0]+0.587*zone[:,:,1]+0.114*zone[:,:,2]))
+    q=_zr(mean)
+    if q%2==bit: return
+    qu,qd=q+1,q-1
+    if   qu>255:              target=float(qd)
+    elif qd<0:                target=float(qu)
+    elif abs(qu-mean)<=abs(qd-mean): target=float(qu)
+    else:                     target=float(qd)
+    d=1 if target>mean else -1
+    flat=zone.reshape(-1,3)
+    cands=np.where(np.any(flat<255,axis=1))[0] if d==1 else np.where(np.any(flat>0,axis=1))[0]
+    if len(cands)==0: return
+    nc=min(len(cands),round(abs(target-mean)*npx))
+    if nc==0: return
+    idx=rng.choice(cands,size=nc,replace=False)
+    flat[idx]=np.clip(flat[idx]+d,0,255)
+    arr[r0:r1,c0:c1]=flat.reshape(h,w,3).astype(np.uint8)
 
-# ── Encode ────────────────────────────────────────────────────────────────────
-def encode_zone(arr, text, n_zones, ecc_nsym):
-    H, W     = arr.shape[:2]
-    payload  = rs_encode(text.encode('utf-8'), ecc_nsym)
-    all_bits = bytes_to_bits(pack_header(len(payload))) + bytes_to_bits(payload)
-    n_bits   = len(all_bits)
-    n_total  = n_zones * n_zones
+def encode_zone(arr,text,nz,ecc):
+    H,W=arr.shape[:2]
+    pl=rs_enc(text.encode(),ecc)
+    bits=to_bits(pack_hdr(len(pl)))+to_bits(pl); nb=len(bits); nt=nz*nz
+    if nb>nt: raise ValueError(f'Too long: need {nb} zones, have {nt}.')
+    rng=np.random.default_rng(0); i=0
+    for row in range(nz):
+        for col in range(nz):
+            if i>=nb: break
+            _zwrite(arr,*_zb(H,W,nz,row,col),bits[i],rng); i+=1
+    return arr,len(pl),nb,nt
 
-    if n_bits > n_total:
-        raise ValueError(
-            f'Message too long: need {n_bits} zones, have {n_total}. '
-            f'Increase zones per side or shorten the message.'
-        )
+def decode_zone(arr,nz,ecc):
+    H,W=arr.shape[:2]
+    it=((r,c) for r in range(nz) for c in range(nz))
+    hbits=[_zread(arr,*_zb(H,W,nz,*next(it))) for _ in range(HEADER_BITS)]
+    plen=unpack_hdr(to_bytes(hbits))
+    pbits=[_zread(arr,*_zb(H,W,nz,*next(it))) for _ in range(plen*8)]
+    return rs_dec(to_bytes(pbits),ecc).decode()
 
-    rng = np.random.default_rng(0)
-    idx = 0
-    for row in range(n_zones):
-        for col in range(n_zones):
-            if idx >= n_bits: break
-            write_bit(arr, *zone_bounds(H, W, n_zones, row, col), all_bits[idx], rng)
-            idx += 1
+# ── Zone Tiled ────────────────────────────────────────────────────────────────
+def _ztb(r0t,c0t,t,n,row,col):
+    return(r0t+round(row/n*t),r0t+round((row+1)/n*t),
+           c0t+round(col/n*t),c0t+round((col+1)/n*t))
 
-    return arr, len(payload), n_bits, n_total
+def _tile_decode(arr,r0t,c0t,tile,nz,ecc):
+    it=((r,c) for r in range(nz) for c in range(nz))
+    hbits=[_zread(arr,*_ztb(r0t,c0t,tile,nz,*next(it))) for _ in range(HEADER_BITS)]
+    plen=unpack_hdr(to_bytes(hbits))
+    pbits=[_zread(arr,*_ztb(r0t,c0t,tile,nz,*next(it))) for _ in range(plen*8)]
+    return rs_dec(to_bytes(pbits),ecc).decode()
 
-# ── Decode ────────────────────────────────────────────────────────────────────
-def decode_zone(arr, n_zones, ecc_nsym):
-    H, W = arr.shape[:2]
-    it   = ((r, c) for r in range(n_zones) for c in range(n_zones))
+def encode_zone_tiled(arr,text,tile,nz,ecc):
+    H,W=arr.shape[:2]
+    if tile//nz<16: raise ValueError(f'Zone {tile//nz}px too small (min 16).')
+    nr,nc=H//tile,W//tile
+    if nr==0 or nc==0: raise ValueError(f'Image {W}x{H} smaller than tile {tile}x{tile}.')
+    pl=rs_enc(text.encode(),ecc)
+    bits=to_bits(pack_hdr(len(pl)))+to_bits(pl); nb=len(bits); nt=nz*nz
+    if nb>nt: raise ValueError(f'Too long: need {nb} zones, have {nt} per tile.')
+    rng=np.random.default_rng(0)
+    for tr in range(nr):
+        for tc in range(nc):
+            r0t,c0t=tr*tile,tc*tile; i=0
+            for row in range(nz):
+                for col in range(nz):
+                    if i>=nb: break
+                    _zwrite(arr,*_ztb(r0t,c0t,tile,nz,row,col),bits[i],rng); i+=1
+    return arr,len(pl),nb,nt,nr*nc
 
-    hbits = [read_bit(arr, *zone_bounds(H, W, n_zones, *next(it))) for _ in range(HEADER_BITS)]
-    payload_len = unpack_header(bits_to_bytes(hbits))
+def decode_zone_tiled(arr,tile,nz,ecc):
+    H,W=arr.shape[:2]; zpx=tile//nz
+    for dy in range(0,tile,zpx):
+        if dy+tile>H: break
+        for dx in range(0,tile,zpx):
+            if dx+tile>W: break
+            try: return _tile_decode(arr,dy,dx,tile,nz,ecc)
+            except Exception: continue
+    raise ValueError('No valid tile found.')
 
-    pbits = [read_bit(arr, *zone_bounds(H, W, n_zones, *next(it))) for _ in range(payload_len * 8)]
-    return rs_decode(bits_to_bytes(pbits), ecc_nsym).decode('utf-8')
+# ── Grid ──────────────────────────────────────────────────────────────────────
+_MK=[[1,0,1],[0,1,0],[1,0,1]]; _MS=3
 
-# ── PSNR helper (for stats display) ──────────────────────────────────────────
-def psnr(orig, enc):
-    mse = float(np.mean((orig.astype(np.float32) - enc.astype(np.float32))**2))
-    if mse == 0: return float('inf')
-    return 10 * np.log10(255**2 / mse)
+def _gdims(H,W,cs): return W//cs,H//cs
+
+def _glum(arr,row,col,cs):
+    y,x=row*cs,col*cs; c=arr[y:y+cs,x:x+cs].astype(np.float32)
+    return float(np.mean(0.299*c[:,:,0]+0.587*c[:,:,1]+0.114*c[:,:,2]))
+
+def _gbit(m,s): return int(round(m/s))%2
+
+def _gtgt(m,bit,s):
+    q=round(m/s)
+    if q%2==bit: return float(q*s)
+    qu,qd=q+1,q-1; tu,td=qu*s,qd*s
+    return float(tu) if abs(tu-m)<=abs(td-m) else float(td)
+
+def _gcell(arr,row,col,cs,bit,s):
+    y,x=row*cs,col*cs; cell=arr[y:y+cs,x:x+cs].astype(np.float32)
+    m=float(np.mean(0.299*cell[:,:,0]+0.587*cell[:,:,1]+0.114*cell[:,:,2]))
+    arr[y:y+cs,x:x+cs]=np.clip(cell+(_gtgt(m,bit,s)-m),0,255).astype(np.uint8)
+
+def _gdata(cols,rows):
+    mk=set()
+    for ro,co in[(0,0),(0,cols-_MS),(rows-_MS,0),(rows-_MS,cols-_MS)]:
+        for dr in range(_MS):
+            for dc in range(_MS): mk.add((ro+dr,co+dc))
+    for r in range(rows):
+        for c in range(cols):
+            if(r,c) not in mk: yield r,c
+
+def _gmarks(arr,cs,s,cols,rows):
+    for ro,co in[(0,0),(0,cols-_MS),(rows-_MS,0),(rows-_MS,cols-_MS)]:
+        for dr in range(_MS):
+            for dc in range(_MS): _gcell(arr,ro+dr,co+dc,cs,_MK[dr][dc],s)
+
+def encode_grid(arr,text,cs,strength,ecc):
+    H,W=arr.shape[:2]; cols,rows=_gdims(H,W,cs)
+    avail=sum(1 for _ in _gdata(cols,rows))
+    pl=rs_enc(text.encode(),ecc)
+    bits=to_bits(pack_hdr(len(pl)))+to_bits(pl); nb=len(bits)
+    if nb>avail: raise ValueError(f'Too long: needs {nb} cells, have {avail}.')
+    it=_gdata(cols,rows)
+    for bit in bits: _gcell(arr,*next(it),cs,bit,strength)
+    _gmarks(arr,cs,strength,cols,rows)
+    return arr,len(pl),nb,avail
+
+def decode_grid(arr,cs,strength,ecc):
+    H,W=arr.shape[:2]; cols,rows=_gdims(H,W,cs)
+    it=_gdata(cols,rows)
+    hbits=[_gbit(_glum(arr,*next(it),cs),strength) for _ in range(HEADER_BITS)]
+    plen=unpack_hdr(to_bytes(hbits))
+    pbits=[_gbit(_glum(arr,*next(it),cs),strength) for _ in range(plen*8)]
+    return rs_dec(to_bytes(pbits),ecc).decode()
 `;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Pyodide bootstrap
-// ─────────────────────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────────
 let py = null;
+let currentMode = 'lsb';
+let encOrigRGB  = null;   // original image bytes — never overwritten after load
+let encW = 0, encH = 0;
 
+// ── Mode switching ────────────────────────────────────────────────────────────
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.mode === mode));
+  document.querySelectorAll('.mode-section').forEach(s =>
+    s.style.display = s.dataset.mode === mode ? '' : 'none');
+  updateCounter();
+}
+document.querySelectorAll('.mode-tab').forEach(t =>
+  t.addEventListener('click', () => setMode(t.dataset.mode)));
+
+// ── Capacity estimate (JS, no Python) ─────────────────────────────────────────
+const HBITS = 32;
+const U8ENC = new TextEncoder();
+
+function estimateCap() {
+  const pi = id => Math.max(0, parseInt(document.getElementById(id).value, 10) || 0);
+  if (currentMode === 'lsb') {
+    if (!encW) return null;
+    return Math.max(0, Math.floor((encW * encH - HBITS) / 8) - pi('lsb-enc-ecc'));
+  }
+  if (currentMode === 'zone') {
+    const nz = pi('zone-enc-zones');
+    return Math.max(0, Math.floor((nz * nz - HBITS) / 8) - pi('zone-enc-ecc'));
+  }
+  if (currentMode === 'zone-tiled') {
+    const nz = pi('zt-enc-zones');
+    return Math.max(0, Math.floor((nz * nz - HBITS) / 8) - pi('zt-enc-ecc'));
+  }
+  if (currentMode === 'grid') {
+    const cs = pi('grid-enc-cell');
+    if (!encW || !cs) return null;
+    const avail = Math.floor(encW / cs) * Math.floor(encH / cs) - 36;
+    return Math.max(0, Math.floor((avail - HBITS) / 8) - pi('grid-enc-ecc'));
+  }
+  return null;
+}
+
+function updateCounter() {
+  const el   = document.getElementById('enc-counter');
+  const text = document.getElementById('enc-text').value;
+  const blen = U8ENC.encode(text).length;
+  const cap  = estimateCap();
+  if (cap === null) {
+    el.textContent = `${text.length} chars — load image to estimate capacity`;
+    el.className = 'char-counter'; return;
+  }
+  el.textContent = `${text.length} / ~${cap} chars available`;
+  el.className = 'char-counter ' + (blen > cap ? 'over' : blen >= cap * .9 ? 'warn' : 'ok');
+}
+
+[
+  'lsb-enc-ecc',
+  'zone-enc-zones','zone-enc-ecc',
+  'zt-enc-tile','zt-enc-zones','zt-enc-ecc',
+  'grid-enc-cell','grid-enc-str','grid-enc-ecc',
+  'enc-text',
+].forEach(id => document.getElementById(id).addEventListener('input', updateCounter));
+
+// ── Image helpers ─────────────────────────────────────────────────────────────
+function fileToCanvas(file, canvasId, phId, fnId) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.getElementById(canvasId);
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        c.getContext('2d').drawImage(img, 0, 0);
+        c.style.display = 'block';
+        document.getElementById(phId).style.display = 'none';
+        const fn = document.getElementById(fnId);
+        fn.textContent = `${file.name}  ${img.naturalWidth}×${img.naturalHeight}`;
+        fn.style.display = 'block';
+        res(c);
+      };
+      img.onerror = rej; img.src = e.target.result;
+    };
+    reader.onerror = rej; reader.readAsDataURL(file);
+  });
+}
+
+function canvasToRGB(c) {
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  const r = new Uint8Array(c.width * c.height * 3);
+  for (let i = 0, j = 0; i < d.length; i += 4, j += 3) { r[j]=d[i]; r[j+1]=d[i+1]; r[j+2]=d[i+2]; }
+  return r;
+}
+
+function rgbToCanvas(rgb, W, H, c) {
+  const ctx = c.getContext('2d'), img = ctx.createImageData(W, H);
+  for (let i = 0, j = 0; j < rgb.length; i += 4, j += 3) {
+    img.data[i]=rgb[j]; img.data[i+1]=rgb[j+1]; img.data[i+2]=rgb[j+2]; img.data[i+3]=255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function setStatus(id, cls, msg) { const el=document.getElementById(id); el.className=`status-box ${cls} show`; el.textContent=msg; }
+function clearStatus(id) { document.getElementById(id).className='status-box'; }
+
+// ── Drag-and-drop ─────────────────────────────────────────────────────────────
+['enc-drop','dec-drop'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('dragover',  e => { e.preventDefault(); el.classList.add('over'); });
+  el.addEventListener('dragleave', ()  => el.classList.remove('over'));
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.classList.remove('over');
+    const inp = el.querySelector('input[type=file]');
+    const dt  = new DataTransfer(); dt.items.add(e.dataTransfer.files[0]);
+    inp.files = dt.files; inp.dispatchEvent(new Event('change'));
+  });
+});
+
+// ── File load ─────────────────────────────────────────────────────────────────
+document.getElementById('enc-file').addEventListener('change', async e => {
+  if (!e.target.files[0]) return;
+  const c = await fileToCanvas(e.target.files[0], 'enc-canvas', 'enc-ph', 'enc-fname');
+  encOrigRGB = canvasToRGB(c);   // store original — encode always reads from here
+  encW = c.width; encH = c.height;
+  document.getElementById('btn-download').disabled = true;
+  clearStatus('enc-status');
+  document.getElementById('enc-stats').innerHTML = '';
+  updateCounter();
+});
+
+document.getElementById('dec-file').addEventListener('change', async e => {
+  if (!e.target.files[0]) return;
+  await fileToCanvas(e.target.files[0], 'dec-canvas', 'dec-ph', 'dec-fname');
+  document.getElementById('dec-result').className = 'result-box';
+  document.getElementById('dec-stats').textContent = '';
+  clearStatus('dec-status');
+});
+
+// ── Encode ────────────────────────────────────────────────────────────────────
+document.getElementById('btn-encode').addEventListener('click', async () => {
+  if (!encOrigRGB) return setStatus('enc-status','err','Load a carrier image first.');
+  const text = document.getElementById('enc-text').value.trim();
+  if (!text)        return setStatus('enc-status','err','Enter a message to hide.');
+
+  const btn = document.getElementById('btn-encode');
+  btn.disabled = true;
+  setStatus('enc-status','info','Encoding…');
+
+  try {
+    // Always encode from the stored original — no refresh needed between runs
+    py.globals.set('_rgb',  encOrigRGB.slice());
+    py.globals.set('_W',    encW);
+    py.globals.set('_H',    encH);
+    py.globals.set('_text', text);
+
+    const pi = id => parseInt(document.getElementById(id).value, 10);
+    let flat, statsHtml;
+
+    if (currentMode === 'lsb') {
+      py.globals.set('_ecc', pi('lsb-enc-ecc'));
+      const r = (await py.runPythonAsync(`
+import numpy as np
+_a=np.frombuffer(bytes(_rgb),dtype=np.uint8).reshape(_H,_W,3).copy()
+_o=_a.copy()
+_a,_pl,_nb,_npx=encode_lsb(_a,_text,_ecc)
+(_a.flatten().tolist(),_pl,_nb,_npx,psnr(_o,_a))
+`)).toJs();
+      [flat] = r; const [,pl,nb,npx,ps]=r;
+      statsHtml=`LSB &nbsp;·&nbsp; <span class=v>${nb.toLocaleString()}</span>/${npx.toLocaleString()} px (${(100*nb/npx).toFixed(1)}%) &nbsp;·&nbsp; ${pl} RS bytes &nbsp;·&nbsp; PSNR <span class=v>${ps.toFixed(1)} dB</span>`;
+
+    } else if (currentMode === 'zone') {
+      py.globals.set('_nz',  pi('zone-enc-zones'));
+      py.globals.set('_ecc', pi('zone-enc-ecc'));
+      const r = (await py.runPythonAsync(`
+import numpy as np
+_a=np.frombuffer(bytes(_rgb),dtype=np.uint8).reshape(_H,_W,3).copy()
+_o=_a.copy()
+_a,_pl,_nb,_nt=encode_zone(_a,_text,_nz,_ecc)
+(_a.flatten().tolist(),_pl,_nb,_nt,psnr(_o,_a))
+`)).toJs();
+      [flat] = r; const [,pl,nb,nt,ps]=r;
+      const nz=pi('zone-enc-zones');
+      statsHtml=`Zone ${nz}×${nz} &nbsp;·&nbsp; <span class=v>${nb}/${nt}</span> zones (${(100*nb/nt).toFixed(0)}%) &nbsp;·&nbsp; ${pl} RS bytes &nbsp;·&nbsp; PSNR <span class=v>${ps.toFixed(1)} dB</span>`;
+
+    } else if (currentMode === 'zone-tiled') {
+      py.globals.set('_tile', pi('zt-enc-tile'));
+      py.globals.set('_nz',   pi('zt-enc-zones'));
+      py.globals.set('_ecc',  pi('zt-enc-ecc'));
+      const r = (await py.runPythonAsync(`
+import numpy as np
+_a=np.frombuffer(bytes(_rgb),dtype=np.uint8).reshape(_H,_W,3).copy()
+_o=_a.copy()
+_a,_pl,_nb,_nt,_ntiles=encode_zone_tiled(_a,_text,_tile,_nz,_ecc)
+(_a.flatten().tolist(),_pl,_nb,_nt,_ntiles,psnr(_o,_a))
+`)).toJs();
+      [flat] = r; const [,pl,nb,nt,ntiles,ps]=r;
+      statsHtml=`Zone Tiled &nbsp;·&nbsp; <span class=v>${ntiles} tiles</span> (${pi('zt-enc-tile')}px) &nbsp;·&nbsp; ${nb}/${nt} zones/tile (${(100*nb/nt).toFixed(0)}%) &nbsp;·&nbsp; ${pl} RS bytes &nbsp;·&nbsp; PSNR <span class=v>${ps.toFixed(1)} dB</span>`;
+
+    } else {
+      py.globals.set('_cs',  pi('grid-enc-cell'));
+      py.globals.set('_str', pi('grid-enc-str'));
+      py.globals.set('_ecc', pi('grid-enc-ecc'));
+      const r = (await py.runPythonAsync(`
+import numpy as np
+_a=np.frombuffer(bytes(_rgb),dtype=np.uint8).reshape(_H,_W,3).copy()
+_o=_a.copy()
+_a,_pl,_nb,_av=encode_grid(_a,_text,_cs,_str,_ecc)
+(_a.flatten().tolist(),_pl,_nb,_av,psnr(_o,_a))
+`)).toJs();
+      [flat] = r; const [,pl,nb,av,ps]=r;
+      statsHtml=`Grid ${pi('grid-enc-cell')}px cells &nbsp;·&nbsp; <span class=v>${nb}/${av}</span> cells (${(100*nb/av).toFixed(0)}%) &nbsp;·&nbsp; ${pl} RS bytes &nbsp;·&nbsp; PSNR <span class=v>${ps.toFixed(1)} dB</span>`;
+    }
+
+    const enc = new Uint8Array(flat);
+    const c   = document.getElementById('enc-canvas');
+    rgbToCanvas(enc, encW, encH, c);
+
+    document.getElementById('enc-stats').innerHTML = statsHtml;
+    setStatus('enc-status','ok','Encoded. Download the PNG to preserve the hidden data.');
+    document.getElementById('btn-download').disabled = false;
+
+  } catch (err) {
+    setStatus('enc-status','err', err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ── Download ──────────────────────────────────────────────────────────────────
+document.getElementById('btn-download').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = 'encoded.png';
+  a.href = document.getElementById('enc-canvas').toDataURL('image/png');
+  a.click();
+});
+
+// ── Decode ────────────────────────────────────────────────────────────────────
+document.getElementById('btn-decode').addEventListener('click', async () => {
+  const c = document.getElementById('dec-canvas');
+  if (!c.width) return setStatus('dec-status','err','Load an encoded image first.');
+
+  const btn = document.getElementById('btn-decode');
+  btn.disabled = true;
+  setStatus('dec-status','info','Decoding…');
+  document.getElementById('dec-result').className = 'result-box';
+
+  try {
+    py.globals.set('_rgb', canvasToRGB(c));
+    py.globals.set('_W',   c.width);
+    py.globals.set('_H',   c.height);
+
+    const pi = id => parseInt(document.getElementById(id).value, 10);
+    const t0 = performance.now();
+    let text;
+
+    const ARR = `import numpy as np\n_a=np.frombuffer(bytes(_rgb),dtype=np.uint8).reshape(_H,_W,3).copy()\n`;
+
+    if (currentMode === 'lsb') {
+      py.globals.set('_ecc', pi('lsb-dec-ecc'));
+      text = await py.runPythonAsync(ARR + `decode_lsb(_a,_ecc)`);
+
+    } else if (currentMode === 'zone') {
+      py.globals.set('_nz',  pi('zone-dec-zones'));
+      py.globals.set('_ecc', pi('zone-dec-ecc'));
+      text = await py.runPythonAsync(ARR + `decode_zone(_a,_nz,_ecc)`);
+
+    } else if (currentMode === 'zone-tiled') {
+      py.globals.set('_tile', pi('zt-dec-tile'));
+      py.globals.set('_nz',   pi('zt-dec-zones'));
+      py.globals.set('_ecc',  pi('zt-dec-ecc'));
+      text = await py.runPythonAsync(ARR + `decode_zone_tiled(_a,_tile,_nz,_ecc)`);
+
+    } else {
+      py.globals.set('_cs',  pi('grid-dec-cell'));
+      py.globals.set('_str', pi('grid-dec-str'));
+      py.globals.set('_ecc', pi('grid-dec-ecc'));
+      text = await py.runPythonAsync(ARR + `decode_grid(_a,_cs,_str,_ecc)`);
+    }
+
+    const ms = (performance.now() - t0).toFixed(0);
+    const res = document.getElementById('dec-result');
+    res.textContent = text; res.className = 'result-box show';
+    document.getElementById('dec-stats').innerHTML =
+      `<span class=v>${text.length}</span> chars decoded in <span class=v>${ms} ms</span>`;
+    setStatus('dec-status','ok','Decoded successfully.');
+
+  } catch (err) {
+    setStatus('dec-status','err', err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ── Pyodide boot ──────────────────────────────────────────────────────────────
 async function boot() {
   const msg = document.getElementById('boot-msg');
   try {
@@ -409,12 +770,9 @@ async function boot() {
     msg.textContent = 'Loading numpy…';
     await py.loadPackage('numpy');
 
-    msg.textContent = 'Installing reedsolo via micropip…';
+    msg.textContent = 'Installing reedsolo…';
     await py.loadPackage('micropip');
-    await py.runPythonAsync(`
-      import micropip
-      await micropip.install('reedsolo')
-    `);
+    await py.runPythonAsync(`import micropip; await micropip.install('reedsolo')`);
 
     msg.textContent = 'Initialising steganography engine…';
     await py.runPythonAsync(PY_CODE);
@@ -424,310 +782,14 @@ async function boot() {
 
     document.getElementById('boot').style.display  = 'none';
     document.getElementById('main').style.display  = 'grid';
-
     document.getElementById('btn-encode').disabled = false;
     document.getElementById('btn-decode').disabled = false;
   } catch (e) {
-    msg.innerHTML = `<span style="color:#f87171">Failed to load: ${e.message}</span>`;
+    msg.innerHTML = `<span style="color:var(--red)">Failed to load: ${e.message}</span>`;
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Image helpers
-// ─────────────────────────────────────────────────────────────────────────────
-function loadFileToCanvas(file, canvasId, previewWrapId) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.getElementById(canvasId);
-        canvas.width  = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        canvas.style.display = 'block';
-        document.querySelector(`#${previewWrapId} .placeholder`).style.display = 'none';
-        resolve({ canvas, img });
-      };
-      img.onerror = reject;
-      img.src = e.target.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function canvasToRGBArray(canvas) {
-  const ctx  = canvas.getContext('2d');
-  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data; // RGBA
-  // Strip alpha: interleave R,G,B only
-  const rgb  = new Uint8Array(canvas.width * canvas.height * 3);
-  for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
-    rgb[j]   = data[i];
-    rgb[j+1] = data[i+1];
-    rgb[j+2] = data[i+2];
-  }
-  return rgb;
-}
-
-function rgbArrayToCanvas(rgb, W, H, canvas) {
-  const ctx     = canvas.getContext('2d');
-  const imgData = ctx.createImageData(W, H);
-  for (let i = 0, j = 0; j < rgb.length; i += 4, j += 3) {
-    imgData.data[i]   = rgb[j];
-    imgData.data[i+1] = rgb[j+1];
-    imgData.data[i+2] = rgb[j+2];
-    imgData.data[i+3] = 255;
-  }
-  ctx.putImageData(imgData, 0, 0);
-}
-
-function setStatus(id, cls, msg) {
-  const el = document.getElementById(id);
-  el.className = `status-box ${cls} show`;
-  el.textContent = msg;
-}
-
-const UTF8_ENCODER = new TextEncoder();
-const ZONE_HEADER_BIT_COUNT = 32;
-const CAPACITY_WARNING_RATIO = 0.9;
-
-function parseNonNegativeInt(value, fallback = 0) {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(0, parsed);
-}
-
-function estimateMessageCapacityChars(zonesPerSide, errorCorrectionBytes) {
-  const totalZoneBits = zonesPerSide * zonesPerSide;
-  const usablePayloadBits = Math.max(0, totalZoneBits - ZONE_HEADER_BIT_COUNT);
-  const payloadBytesCapacity = Math.floor(usablePayloadBits / 8);
-  return Math.max(0, payloadBytesCapacity - errorCorrectionBytes);
-}
-
-function readEncodeCapacityState() {
-  const zonesPerSide = parseNonNegativeInt(document.getElementById('enc-zones').value);
-  const errorCorrectionBytes = parseNonNegativeInt(document.getElementById('enc-ecc').value);
-  const messageText = document.getElementById('enc-text').value.trim();
-  const messageCharacterCount = messageText.length;
-  const messageByteCount = UTF8_ENCODER.encode(messageText).length;
-  const availableCharacterEstimate = estimateMessageCapacityChars(zonesPerSide, errorCorrectionBytes);
-
-  return {
-    zonesPerSide,
-    errorCorrectionBytes,
-    messageText,
-    messageCharacterCount,
-    messageByteCount,
-    availableCharacterEstimate
-  };
-}
-
-function updateEncodeCharCounter() {
-  const counter = document.getElementById('enc-char-counter');
-  const {
-    messageCharacterCount,
-    messageByteCount,
-    availableCharacterEstimate
-  } = readEncodeCapacityState();
-
-  counter.textContent = `${messageCharacterCount} / ~${availableCharacterEstimate} chars available`;
-  counter.className = 'char-counter';
-
-  if (messageByteCount > availableCharacterEstimate) {
-    counter.classList.add('over');
-  } else if (
-    availableCharacterEstimate > 0 &&
-    messageByteCount >= Math.floor(availableCharacterEstimate * CAPACITY_WARNING_RATIO)
-  ) {
-    counter.classList.add('warn');
-  } else {
-    counter.classList.add('ok');
-  }
-
-  return { messageByteCount, availableCharacterEstimate };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// File drag-and-drop polish
-// ─────────────────────────────────────────────────────────────────────────────
-['enc-drop', 'dec-drop'].forEach(id => {
-  const el = document.getElementById(id);
-  el.addEventListener('dragover',  e => { e.preventDefault(); el.classList.add('over'); });
-  el.addEventListener('dragleave', ()  => el.classList.remove('over'));
-  el.addEventListener('drop', e => {
-    e.preventDefault(); el.classList.remove('over');
-    const input = el.querySelector('input[type=file]');
-    // Trigger our change handler with the dropped file
-    const dt  = new DataTransfer();
-    dt.items.add(e.dataTransfer.files[0]);
-    input.files = dt.files;
-    input.dispatchEvent(new Event('change'));
-  });
-});
-
-// Auto-preview on file select
-document.getElementById('enc-file').addEventListener('change', async e => {
-  if (!e.target.files[0]) return;
-  await loadFileToCanvas(e.target.files[0], 'enc-canvas', 'enc-preview-wrap');
-  document.getElementById('enc-stats').textContent = '';
-  document.getElementById('btn-download').disabled = true;
-  const s = document.getElementById('enc-status');
-  s.className = 'status-box'; s.textContent = '';
-});
-
-['enc-text', 'enc-zones', 'enc-ecc'].forEach(id => {
-  document.getElementById(id).addEventListener('input', updateEncodeCharCounter);
-});
-
-document.getElementById('dec-file').addEventListener('change', async e => {
-  if (!e.target.files[0]) return;
-  await loadFileToCanvas(e.target.files[0], 'dec-canvas', 'dec-preview-wrap');
-  document.getElementById('dec-result').className = 'decoded-text';
-  document.getElementById('dec-label').style.display = 'none';
-  const s = document.getElementById('dec-status');
-  s.className = 'status-box'; s.textContent = '';
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Encode
-// ─────────────────────────────────────────────────────────────────────────────
-document.getElementById('btn-encode').addEventListener('click', async () => {
-  const encodeButton = document.getElementById('btn-encode');
-  const {
-    messageText,
-    messageByteCount,
-    zonesPerSide,
-    errorCorrectionBytes,
-    availableCharacterEstimate
-  } = readEncodeCapacityState();
-  const canvas = document.getElementById('enc-canvas');
-
-  if (!canvas.width) return setStatus('enc-status', 'err', 'Load an image first.');
-  if (!messageText)  return setStatus('enc-status', 'err', 'Enter a message to encode.');
-  if (messageByteCount > availableCharacterEstimate) {
-    updateEncodeCharCounter();
-    return setStatus(
-      'enc-status',
-      'warn',
-      `Message is too long for current settings (${messageByteCount} bytes, ~${availableCharacterEstimate} available). Increase grid detail or lower error recovery strength.`
-    );
-  }
-
-  encodeButton.disabled = true;
-  setStatus('enc-status', 'info', 'Encoding…');
-
-  try {
-    const origRGB = canvasToRGBArray(canvas);
-    const W = canvas.width, H = canvas.height;
-
-    // Pass raw bytes to Python
-    py.globals.set('_rgb',    origRGB);
-    py.globals.set('_W',      W);
-    py.globals.set('_H',      H);
-    py.globals.set('_text',   messageText);
-    py.globals.set('_nz',     zonesPerSide);
-    py.globals.set('_ecc',    errorCorrectionBytes);
-
-    const result = await py.runPythonAsync(`
-import numpy as np
-_arr    = np.frombuffer(bytes(_rgb), dtype=np.uint8).reshape(_H, _W, 3).copy()
-_orig   = _arr.copy()
-_arr, _payload_len, _n_bits, _n_total = encode_zone(_arr, _text, _nz, _ecc)
-_psnr   = psnr(_orig, _arr)
-_pixels = int(np.sum(_arr != _orig))
-(_arr.flatten().tolist(), _payload_len, _n_bits, _n_total, _psnr, _pixels)
-`);
-
-    const [flatList, payloadLen, nBits, nTotal, imgPsnr, pixelsChanged] = result.toJs();
-    const encoded = new Uint8Array(flatList);
-
-    rgbArrayToCanvas(encoded, W, H, canvas);
-
-    // Store for download
-    canvas._encodedData = encoded;
-    canvas._W = W; canvas._H = H;
-
-    const usePct = (100 * nBits / nTotal).toFixed(0);
-    document.getElementById('enc-stats').innerHTML =
-      `${zonesPerSide}×${zonesPerSide} grid &nbsp;·&nbsp; ` +
-      `${nBits}/${nTotal} zones (${usePct}%) &nbsp;·&nbsp; ` +
-      `${payloadLen} RS bytes &nbsp;·&nbsp; ` +
-      `PSNR <span>${imgPsnr.toFixed(1)} dB</span> &nbsp;·&nbsp; ` +
-      `${pixelsChanged.toLocaleString()} px changed (max delta 1)`;
-
-    setStatus('enc-status', 'ok', 'Encoded. Download the PNG to preserve data.');
-    document.getElementById('btn-download').disabled = false;
-  } catch (e) {
-    setStatus('enc-status', 'err', e.message);
-  }
-  encodeButton.disabled = false;
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Download
-// ─────────────────────────────────────────────────────────────────────────────
-document.getElementById('btn-download').addEventListener('click', () => {
-  const canvas = document.getElementById('enc-canvas');
-  const link   = document.createElement('a');
-  link.download = 'encoded.png';
-  link.href     = canvas.toDataURL('image/png');
-  link.click();
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Decode
-// ─────────────────────────────────────────────────────────────────────────────
-document.getElementById('btn-decode').addEventListener('click', async () => {
-  const decodeButton = document.getElementById('btn-decode');
-  const zonesPerSide = Number.parseInt(document.getElementById('dec-zones').value, 10);
-  const errorCorrectionBytes = Number.parseInt(document.getElementById('dec-ecc').value, 10);
-  const canvas = document.getElementById('dec-canvas');
-
-  if (!canvas.width) return setStatus('dec-status', 'err', 'Load an encoded image first.');
-
-  decodeButton.disabled = true;
-  setStatus('dec-status', 'info', 'Decoding…');
-  document.getElementById('dec-result').className    = 'decoded-text';
-  document.getElementById('dec-label').style.display = 'none';
-
-  try {
-    const rgb = canvasToRGBArray(canvas);
-    const W   = canvas.width, H = canvas.height;
-
-    py.globals.set('_rgb', rgb);
-    py.globals.set('_W',   W);
-    py.globals.set('_H',   H);
-    py.globals.set('_nz',  zonesPerSide);
-    py.globals.set('_ecc', errorCorrectionBytes);
-
-    const t0   = performance.now();
-    const text = await py.runPythonAsync(`
-import numpy as np
-_arr = np.frombuffer(bytes(_rgb), dtype=np.uint8).reshape(_H, _W, 3).copy()
-decode_zone(_arr, _nz, _ecc)
-`);
-    const ms = (performance.now() - t0).toFixed(0);
-
-    const resultEl = document.getElementById('dec-result');
-    resultEl.textContent = text;
-    resultEl.className   = 'decoded-text show';
-    document.getElementById('dec-label').style.display = 'block';
-
-    document.getElementById('dec-stats').textContent =
-      `Decoded ${text.length} chars in ${ms} ms`;
-
-    setStatus('dec-status', 'ok', 'Decoded successfully.');
-  } catch (e) {
-    setStatus('dec-status', 'err', e.message);
-  }
-  decodeButton.disabled = false;
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Start
-// ─────────────────────────────────────────────────────────────────────────────
-updateEncodeCharCounter();
+updateCounter();
 boot();
 </script>
 </body>
